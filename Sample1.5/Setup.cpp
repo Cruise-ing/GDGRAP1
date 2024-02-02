@@ -21,6 +21,10 @@ GLFWwindow* window;
 //Mod for model's x position
 float x_mod = 0;
 float y_mod = 0;
+float x_mod2 = 0;
+float y_mod2 = 0;
+float x_mod3 = 0;
+float y_mod3 = 0;
 float theta = 90;
 
 void Key_Callback(GLFWwindow* window,
@@ -208,6 +212,14 @@ int main(void)
         x_mod = radius * cos(glm::radians(theta));
         y_mod = radius * sin(glm::radians(theta));
 
+        x_mod2 = radius * cos(glm::radians(theta + 120.0f));
+        y_mod2 = radius * sin(glm::radians(theta + 120.0f));
+
+        x_mod3 = radius * cos(glm::radians(theta + 240.0f));
+        y_mod3 = radius * sin(glm::radians(theta + 240.0f));
+
+        
+
         /*
          if (x_mod >= 1.0f) x_mod = -1.0f;
          else if (x_mod <= -1.0f) x_mod = 1.0f;
@@ -241,6 +253,34 @@ int main(void)
         glBindVertexArray(VAO);
 
         glDrawElements(GL_TRIANGLES, mesh_indices.size(), GL_UNSIGNED_INT, 0);
+
+
+        glm::mat4 transformation_matrix2 = glm::translate(identity_matrix, glm::vec3(x_mod2, y_mod2, -5.0f)); 
+        transformation_matrix2 = glm::scale(transformation_matrix2, glm::vec3(2.0f, 2.0f, 2.0f)); 
+        transformation_matrix2 = glm::rotate(transformation_matrix2, glm::radians(theta + 120.0f), glm::normalize(glm::vec3(0.0f, 1.0f, 0.0f))); 
+
+        unsigned int transformLoc2 = glGetUniformLocation(shaderProg, "transform"); 
+        glUniformMatrix4fv(transformLoc2, 1, GL_FALSE, glm::value_ptr(transformation_matrix2));
+
+        glBindVertexArray(VAO); 
+        glDrawElements(GL_TRIANGLES, mesh_indices.size(), GL_UNSIGNED_INT, 0);
+
+        glm::mat4 transformation_matrix3 = glm::translate(identity_matrix, glm::vec3(x_mod3, y_mod3, -5.0f));
+        transformation_matrix3 = glm::scale(transformation_matrix3, glm::vec3(2.0f, 2.0f, 2.0f));
+        transformation_matrix3 = glm::rotate(transformation_matrix3, glm::radians(theta + 240.0f), glm::normalize(glm::vec3(0.0f, 1.0f, 0.0f)));
+
+        unsigned int transformLoc3 = glGetUniformLocation(shaderProg, "transform");
+        glUniformMatrix4fv(transformLoc3, 1, GL_FALSE, glm::value_ptr(transformation_matrix3));
+
+        glBindVertexArray(VAO);
+        glDrawElements(GL_TRIANGLES, mesh_indices.size(), GL_UNSIGNED_INT, 0);
+
+        /* Swap front and back buffers */
+        glfwSwapBuffers(window);
+
+        /* Poll for and process events */
+        glfwPollEvents();
+
 
         /* Swap front and back buffers */
         glfwSwapBuffers(window);
