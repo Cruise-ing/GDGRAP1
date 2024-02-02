@@ -204,6 +204,10 @@ int main(void)
 
         glUseProgram(shaderProg);
 
+        float radius = 2.0f;
+        x_mod = radius * cos(glm::radians(theta));
+        y_mod = radius * sin(glm::radians(theta));
+
         /*
          if (x_mod >= 1.0f) x_mod = -1.0f;
          else if (x_mod <= -1.0f) x_mod = 1.0f;
@@ -221,7 +225,9 @@ int main(void)
         // glm::mat4 identity_matrix4 = glm::translate (identity_matrix4, glm::vec3(x,y,z));
         // glm::mat4 identity_matrix4 = glm::rotate (identity_matrix4, glm::radians(theta), glm::vec3(x,y,z));
 
-        glm::mat4 transformation_matrix = glm::translate(identity_matrix, glm::vec3(0.0f, 0.0f, -5.0f));
+        theta += 0.01f;
+
+        glm::mat4 transformation_matrix = glm::translate(identity_matrix, glm::vec3(x_mod, y_mod, -5.0f));
         transformation_matrix = glm::scale(transformation_matrix, glm::vec3(2.0f, 2.0f, 2.0f));
         transformation_matrix = glm::rotate(transformation_matrix, glm::radians(theta), glm::normalize(glm::vec3(0.0f, 1.0f, 0.0f)));
 
