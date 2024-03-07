@@ -13,6 +13,12 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{d3e2985b-2ffd-453d-b232-d71283776906}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Skybox">
+      <UniqueIdentifier>{11d64033-ff6d-41d8-9256-b434a46e540b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Setup.cpp">
@@ -31,7 +37,19 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Shaders\Sample.vert" />
-    <CopyFileToFolders Include="Shaders\Sample1.frag" />
+    <None Include="Shaders\betlog.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\Sample.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\x64\Release\Shaders\betlog.frag">
+      <Filter>Shaders</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="Shaders\Sample1.frag">
+      <Filter>Shaders</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
 </Project>

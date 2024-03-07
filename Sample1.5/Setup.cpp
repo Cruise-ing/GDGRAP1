@@ -2,12 +2,13 @@
 #include <GLFW/glfw3.h>
 #include <string>
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <vector>
 
-//GLM Headers
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
@@ -15,40 +16,118 @@
 #include "tiny_obj_loader.h"
 #include "stb_image.h"
 
-
-#include <cmath>
-
 GLFWwindow* window;
 
-
-//Mod for model's x position
 float x_mod = 0;
 float y_mod = 0;
-float x_mod2 = 0;
-float y_mod2 = 0;
-float x_mod3 = 0;
-float y_mod3 = 0;
 float theta = 90;
 
-void Key_Callback(GLFWwindow* window,
-    int key,
-    int scancode,
-    int action,
-    int mods)
-{
-    if (key == GLFW_KEY_D)
-        x_mod += 0.1f;
-    if (key == GLFW_KEY_A)
-        x_mod -= 0.1f;
-    if (key == GLFW_KEY_W)
-        theta += 1;
-    if (key == GLFW_KEY_S)
-        y_mod -= 0.1f;
+// FPS Camera variables
+glm::vec3 cameraPosition = glm::vec3(0.0f, 0.0f, 5.0f);
+glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+float yaw = -90.0f;
+float pitch = 0.0f;
+float fov = 45.0f;
+float cameraSpeed = 1.f;
+float cameraSensitivity = 0.05f;
+float lastX = 400, lastY = 300;
+bool firstMouse = true;
+float deltaTime = 0.0f;
+float lastFrame = 0.0f;
 
+// Model3D class
+class Model3D {
+public:
+    glm::vec3 position;  // Position of the model in 3D space
+    glm::vec3 rotation;  // Rotation angles (in degrees) around x, y, z axes
+    glm::vec3 scale;     // Scaling factors along x, y, z axes
+
+    Model3D(glm::vec3 pos, glm::vec3 rot, glm::vec3 scl)
+        : position(pos), rotation(rot), scale(scl) {}
+
+    // Calculate the model matrix based on position, rotation, and scale
+    glm::mat4 getModelMatrix() const {
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, position);  // Translate to the specified position
+        model = glm::rotate(model, glm::radians(rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));  // Rotate around x-axis
+        model = glm::rotate(model, glm::radians(rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));  // Rotate around y-axis
+        model = glm::rotate(model, glm::radians(rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));  // Rotate around z-axis
+        model = glm::scale(model, scale);  // Scale the model
+        return model;
+    }
+};
+
+// Create a new model with default rotation and scale, positioned at 'position'
+Model3D spawnNewModel(const glm::vec3& position) {
+    return Model3D(position, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.1f, 0.1f, 0.1f));
 }
+
+// Mouse callback function for camera control
+void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
+    if (firstMouse) {
+        lastX = xpos;  // Initialize last X coordinate for mouse movement
+        lastY = ypos;  // Initialize last Y coordinate for mouse movement
+        firstMouse = false;  // Set to false after the first mouse movement
+    }
+
+    // Calculate the offset of mouse movement
+    float xoffset = xpos - lastX;
+    float yoffset = lastY - ypos;
+    lastX = xpos;
+    lastY = ypos;
+
+    // Apply sensitivity to mouse movement
+    xoffset *= cameraSensitivity;
+    yoffset *= cameraSensitivity;
+
+    // Update yaw (horizontal rotation) and pitch (vertical rotation) based on mouse movement
+    yaw += xoffset;
+    pitch += yoffset;
+
+    // Clamp pitch to prevent flipping
+    if (pitch > 89.0f)
+        pitch = 89.0f;
+    if (pitch < -89.0f)
+        pitch = -89.0f;
+
+    // Calculate the new front vector based on yaw and pitch
+    glm::vec3 front;
+    front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+    front.y = sin(glm::radians(pitch));
+    front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+    cameraFront = glm::normalize(front);  // Normalize the front vector
+}
+
+// Scroll callback function for camera control
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+    // Adjust field of view (FOV) based on scroll input
+    fov -= (float)yoffset;
+
+    // Clamp FOV to reasonable values
+    if (fov < 1.0f)
+        fov = 1.0f;
+    if (fov > 45.0f)
+        fov = 45.0f;
+}
+
+
+// Process input function for camera control
+void processInput(GLFWwindow* window) {
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        cameraPosition += cameraSpeed * cameraFront * deltaTime;  // Move forward
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        cameraPosition -= cameraSpeed * cameraFront * deltaTime;  // Move backward
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        cameraPosition -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed * deltaTime;  // Strafe left
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        cameraPosition += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed * deltaTime;  // Strafe right
+}
+
 
 int main(void)
 {
+
     float window_width = 600;
     float window_height = 600;
 
@@ -80,6 +159,24 @@ int main(void)
     std::string fragS = fragBuff.str();
     const char* f = fragS.c_str();
 
+    std::fstream vertSkySrc("Shaders/betlog.vert");
+    std::stringstream vertSkyBuff;
+
+    vertSkyBuff << vertSkySrc.rdbuf();
+
+    std::string vertSky = vertSkyBuff.str();
+    const char* v_sky = vertSky.c_str();
+
+    std::fstream fragSkySrc("Shaders/betlog.frag");
+    std::stringstream fragSkyBuff;
+
+    fragSkyBuff << fragSkySrc.rdbuf();
+
+    std::string fragSky = fragSkyBuff.str();
+    const char* f_sky = fragSky.c_str();
+
+
+
     /* Make the window's context current */
     glfwMakeContextCurrent(window);
 
@@ -100,7 +197,17 @@ int main(void)
 
     //glViewport(0, 0, 300, 600); // MIn x, y, width , height
 
-    glfwSetKeyCallback(window, Key_Callback);
+
+    // Set up camera control callbacks
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetScrollCallback(window, scroll_callback);
+
+
+    // Create a Model3D instance for spawned models
+    std::vector<Model3D> models;
+    Model3D spawnedModel(glm::vec3(0.0f, 0.0f, -5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.1f, 0.1f, 0.1f));
+    double lastSpawnTime = glfwGetTime();
 
     GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, &v, NULL);
@@ -115,6 +222,20 @@ int main(void)
     glAttachShader(shaderProg, fragShader);
 
     glLinkProgram(shaderProg);
+
+    GLuint vertexSkyboxShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertexSkyboxShader, 1, &v_sky, NULL);
+    glCompileShader(vertexSkyboxShader);
+
+    GLuint fragSkyboxShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragSkyboxShader, 1, &f_sky, NULL);
+    glCompileShader(fragSkyboxShader);
+
+    GLuint skyboxShaderProg = glCreateProgram();
+    glAttachShader(skyboxShaderProg, vertexSkyboxShader);
+    glAttachShader(skyboxShaderProg, fragSkyboxShader);
+
+    glLinkProgram(skyboxShaderProg);
 
     std::string path = "3D/djSword.obj";
     std::vector <tinyobj::shape_t> shapes;
@@ -178,6 +299,42 @@ int main(void)
         );
     }
 
+    float skyboxVertices[]{
+        -1.f, -1.f, 1.f, //0
+        1.f, -1.f, 1.f,  //1
+        1.f, -1.f, -1.f, //2
+        -1.f, -1.f, -1.f,//3
+        -1.f, 1.f, 1.f,  //4
+        1.f, 1.f, 1.f,   //5
+        1.f, 1.f, -1.f,  //6
+        -1.f, 1.f, -1.f  //7
+    };
+
+    //Skybox Indices
+    unsigned int skyboxIndices[]{
+        1,2,6,
+        6,5,1,
+
+        0,4,7,
+        7,3,0,
+
+        4,5,6,
+        6,7,4,
+
+        0,3,2,
+        2,1,0,
+
+        0,1,5,
+        5,4,0,
+
+        3,7,6,
+        6,2,3
+    };
+
+
+
+
+
     GLfloat vertices[]{
         //x   y    z
         0.f, 0.5f, 0.f,
@@ -200,15 +357,56 @@ int main(void)
         0.f, 0.f
     };
 
+    unsigned int skyboxVAO, skyboxVBO, skyboxEBO;
+    glGenVertexArrays(1, &skyboxVAO);
+    glGenBuffers(1, &skyboxVBO);
+    glGenBuffers(1, &skyboxEBO);
+    glBindVertexArray(skyboxVAO);
+
+
+    glBindBuffer(GL_ARRAY_BUFFER, skyboxVBO);
+
+    glBufferData(
+        GL_ARRAY_BUFFER,
+        sizeof(skyboxVertices),
+        &skyboxVertices,
+        GL_STATIC_DRAW
+    );
+
+    glVertexAttribPointer(
+        0,
+        3,
+        GL_FLOAT,
+        GL_FALSE,
+        3 * sizeof(float),
+        (void*)0
+    );
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, skyboxEBO);
+    glBufferData(
+        GL_ELEMENT_ARRAY_BUFFER,
+        sizeof(GL_INT) * 36,
+        &skyboxIndices,
+        GL_STATIC_DRAW
+    );
+
+    glEnableVertexAttribArray(0);
+
+    std::string facesSkybox[]{
+        "Skybox/rainbow_rt.png",
+        "Skybox/rainbow_lf.png",
+        "Skybox/rainbow_up.png",
+        "Skybox/rainbow_dn.png",
+        "Skybox/rainbow_ft.png",
+        "Skybox/rainbow_bk.png",
+    };
+
+
     GLuint VAO, VBO, EBO, VBO_UV;
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
-  // i  glGenBuffers(1, &VBO_UV);
-  //  glGenBuffers(1, &EBO);
-
-    //Currently editing VAO = null
     glBindVertexArray(VAO);
-    //Currently editing  VAO = VAO
+
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
 
@@ -216,7 +414,7 @@ int main(void)
         GL_ARRAY_BUFFER,
         sizeof(GLfloat) * fullVertexData.size(),
         fullVertexData.data(),
-        GL_DYNAMIC_DRAW
+        GL_STATIC_DRAW
     );
 
     glVertexAttribPointer(
@@ -227,58 +425,6 @@ int main(void)
         8 * sizeof(float),
         (void*)0
     );
-
- 
-
-    //Currently editing VBO = VBO
-    //VAO <- VBO
-
-    /*
-    glBufferData(GL_ARRAY_BUFFER,
-        sizeof(GL_FLOAT) * attributes.vertices.size(),
-        attributes.vertices.data(),
-        GL_STATIC_DRAW);
-
-    glVertexAttribPointer(
-        0, // 0 pos, 2 texture
-        3, //  3 components
-        GL_FLOAT,
-        GL_FALSE,
-        3 * sizeof(float),
-        (void*)0
-    );
-
-    */
-
-    /* VBO = VBO
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-     VBO = EBO */
-
-    /*
-
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-        sizeof(GLuint) * mesh_indices.size(),
-        mesh_indices.data(),
-        GL_STATIC_DRAW
-    );
-
-    
-
-    glBindBuffer(GL_ARRAY_BUFFER, VBO_UV);
-
-    glBufferData(GL_ARRAY_BUFFER,
-        sizeof(GLfloat) * (sizeof(UV) / sizeof(UV[0])),
-        &UV[0],
-        GL_DYNAMIC_DRAW);
-
-    glVertexAttribPointer(
-        2,
-        2,
-        GL_FLOAT,
-        GL_FALSE,
-        2 * sizeof(float),
-        (void*)0
-    ); */
 
     glEnableVertexAttribArray(0);
 
@@ -293,7 +439,7 @@ int main(void)
         (void*)normalPtr
     );
 
-    glEnableVertexAttribArray(1);  
+    glEnableVertexAttribArray(1);
 
     GLintptr uvPtr = 6 * sizeof(float);
 
@@ -307,7 +453,7 @@ int main(void)
     );
 
 
-    glEnableVertexAttribArray(2); 
+    glEnableVertexAttribArray(2);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -315,22 +461,45 @@ int main(void)
 
     glBindVertexArray(0);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); 
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
 
 
     glm::mat4 identity_matrix = glm::mat4(1.0f);
 
-    /*
-    glm::mat4 projectionMatrix = glm::ortho(
-        -2.f, // L
-        2.f,  // R
-        -2.f, // B
-        2.f,  // T
-        -1.f, // Znear
-        1.f   // Zfar
-    );
-    */
+    unsigned int skyboxTex;
+
+    glGenTextures(1, &skyboxTex);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTex);
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    for (unsigned int i = 0; i < 6; i++) {
+        int w, h, skyCChannel;
+        stbi_set_flip_vertically_on_load(false);
+        unsigned char* data = stbi_load(facesSkybox[i].c_str(), &w, &h, &skyCChannel, 0);
+
+        if (data) {
+            glTexImage2D(
+                GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                0,
+                GL_RGB,
+                w,
+                h,
+                0,
+                GL_RGB,
+                GL_UNSIGNED_BYTE,
+                data
+            );
+
+            stbi_image_free(data);
+        }
+    }
 
     GLuint texture;
     glGenTextures(1, &texture);
@@ -352,9 +521,9 @@ int main(void)
 
     glEnable(GL_DEPTH_TEST);
 
-    
-    
-    
+
+
+
 
     glm::mat4 projectionMatrix = glm::perspective(
         glm::radians(60.f),
@@ -378,22 +547,7 @@ int main(void)
     glm::vec3 R = glm::normalize(glm::cross(F, WorldUp));
 
     glm::vec3 U = glm::normalize(glm::cross(R, F));
-    /*
-    glm::mat4 cameraOrientation = glm::mat4(1.f);
 
-
-    cameraOrientation[0][0] = R.x;
-    cameraOrientation[1][0] = R.y;
-    cameraOrientation[2][0] = R.z;
-
-    cameraOrientation[0][1] = U.x;
-    cameraOrientation[1][1] = U.y;
-    cameraOrientation[2][1] = U.z;
-
-    cameraOrientation[0][2] = -F.x;
-    cameraOrientation[1][2] = -F.y;
-    cameraOrientation[2][2] = -F.z;
-    */
 
     glm::vec3 lightPos = glm::vec3(-10, 5, 7);
     glm::vec3 lightColor = glm::vec3(0.941, 0.608, 0.122);
@@ -404,7 +558,7 @@ int main(void)
     float specPhong = 16;
 
 
-    
+
 
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))
@@ -413,102 +567,106 @@ int main(void)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
+        glDepthMask(GL_FALSE);
+        glDepthFunc(GL_LEQUAL);
+        glUseProgram(skyboxShaderProg);
+
+        glm::mat4 sky_view = glm::mat4(1.f);
+        sky_view = glm::mat4(glm::mat3(viewMatrix));
+        glm::mat4 projection = glm::perspective(glm::radians(fov), window_width / window_height, 0.1f, 100.0f);
+
+
+        unsigned int skyboxViewLoc = glGetUniformLocation(skyboxShaderProg, "view");
+        glUniformMatrix4fv(skyboxViewLoc,
+            1,
+            GL_FALSE,
+            glm::value_ptr(sky_view));
+
+        unsigned int skyboxProjLoc = glGetUniformLocation(skyboxShaderProg, "projection");
+        glUniformMatrix4fv(skyboxProjLoc,
+            1,
+            GL_FALSE,
+            glm::value_ptr(projection));
+
+        glBindVertexArray(skyboxVAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTex);
+        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+        glDepthMask(GL_TRUE);
+        glDepthFunc(GL_LESS);
+
+
         glUseProgram(shaderProg);
 
+        //Keep track of time to use for cooldown
+        float currentFrame = glfwGetTime();
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
 
-
-        /*
-         if (x_mod >= 1.0f) x_mod = -1.0f;
-         else if (x_mod <= -1.0f) x_mod = 1.0f;
-         else if (y_mod >= 1.0f) y_mod = -1.0f;
-         else if (y_mod <= -1.0f) y_mod = 1.0f;
-
-        unsigned int xLoc = glGetUniformLocation(shaderProg, "x");
-        unsigned int yLoc = glGetUniformLocation(shaderProg, "y");
-
-        glUniform1f(xLoc, x_mod);
-        glUniform1f(yLoc, y_mod);
-        */
-
-        // glm::mat4 identity_matrix4 = glm::mat4(1.0f);
-        // glm::mat4 identity_matrix4 = glm::translate (identity_matrix4, glm::vec3(x,y,z));
-        // glm::mat4 identity_matrix4 = glm::rotate (identity_matrix4, glm::radians(theta), glm::vec3(x,y,z));
-
-
-        
-
-        glm::mat4 transformation_matrix = glm::translate(identity_matrix, glm::vec3(0, 0, -5.0f));
-        transformation_matrix = glm::scale(transformation_matrix, glm::vec3(0.1f, 0.1f, 0.1f));
-        transformation_matrix = glm::rotate(transformation_matrix, glm::radians(theta), glm::normalize(glm::vec3(0.0f, 1.0f, 0.0f)));
-
-
+        glm::mat4 view = glm::lookAt(cameraPosition, cameraPosition + cameraFront, cameraUp);
+        unsigned int viewLoc = glGetUniformLocation(shaderProg, "view");
+        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
         unsigned int projectionLoc = glGetUniformLocation(shaderProg, "projection");
-        glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projectionMatrix));
 
-        unsigned int viewLoc = glGetUniformLocation(shaderProg, "view"); 
-        glUniformMatrix4fv(viewLoc, 
-            1, 
-            GL_FALSE, 
-            glm::value_ptr(viewMatrix)); 
+        glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
-        unsigned int transformLoc = glGetUniformLocation(shaderProg, "transform");   
-
-        GLuint tex0Address = glGetUniformLocation(shaderProg, "tex0");
-
-        glBindTexture(GL_TEXTURE_2D, texture);
-
-        GLuint lightAddress = glGetUniformLocation(shaderProg, "lightPos");
-        glUniform3fv(lightAddress, 1, glm::value_ptr(lightPos));
-        GLuint lightColorAddress = glGetUniformLocation(shaderProg, "lightColor");
-        glUniform3fv(lightColorAddress, 1, glm::value_ptr(lightColor));
-        GLuint ambientStrAddress = glGetUniformLocation(shaderProg, "ambientStr");
-        glUniform1f(ambientStrAddress, ambientStr);
-        GLuint ambientColorAddress = glGetUniformLocation(shaderProg, "ambientColor");
-        glUniform3fv(ambientColorAddress, 1, glm::value_ptr(ambientColor));
-        GLuint cameraPosAddress = glGetUniformLocation(shaderProg, "cameraPos");
-        glUniform3fv(cameraPosAddress, 1, glm::value_ptr(cameraPos));
-        GLuint specStrAddress = glGetUniformLocation(shaderProg, "specStr");
-        glUniform1f(specStrAddress, specStr);
-        GLuint specPhongAddress = glGetUniformLocation(shaderProg, "specPhong");
-        glUniform1f(specPhongAddress, specPhong);
-
-        
-
-        glUniform1i(tex0Address, 0);
+        //Keep listening for inputs from the function processInput()
+        processInput(window);
 
 
-        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transformation_matrix));
 
-        glBindVertexArray(VAO);
+        // Spawn a new model with a 3-second cooldown
+        double currentTime = glfwGetTime();
+        if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && currentTime - lastSpawnTime > 1.0) {
+            // Create a new model and add it to the models vector
+            models.push_back(spawnNewModel(cameraPosition + 2.0f * cameraFront));
+            lastSpawnTime = currentTime;
 
-        // glDrawElements(GL_TRIANGLES, mesh_indices.size(), GL_UNSIGNED_INT, 0);
+        }
 
-        glDrawArrays(GL_TRIANGLES, 0, fullVertexData.size() / 8);
 
-        /*
 
-        glm::mat4 transformation_matrix2 = glm::translate(identity_matrix, glm::vec3(0, 0, -5.0f)); 
-        transformation_matrix2 = glm::scale(transformation_matrix2, glm::vec3(2.0f, 2.0f, 2.0f)); 
-        transformation_matrix2 = glm::rotate(transformation_matrix2, glm::radians(theta + 120.0f), glm::normalize(glm::vec3(0.0f, 1.0f, 0.0f))); 
+        for (const auto& model : models) {
+            // Render the spawned model
+            glm::mat4 transform = model.getModelMatrix();
 
-        unsigned int transformLoc2 = glGetUniformLocation(shaderProg, "transform"); 
-        glUniformMatrix4fv(transformLoc2, 1, GL_FALSE, glm::value_ptr(transformation_matrix2));
+            unsigned int transformLoc = glGetUniformLocation(shaderProg, "transform");
+            glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transform));
 
-        glBindVertexArray(VAO); 
-        glDrawElements(GL_TRIANGLES, mesh_indices.size(), GL_UNSIGNED_INT, 0);
+            // Use the model's transformation directly, no need for fixed transformations
+            GLuint tex0Address = glGetUniformLocation(shaderProg, "tex0");
 
-        glm::mat4 transformation_matrix3 = glm::translate(identity_matrix, glm::vec3(0, 0, -5.0f));
-        transformation_matrix3 = glm::scale(transformation_matrix3, glm::vec3(2.0f, 2.0f, 2.0f));
-        transformation_matrix3 = glm::rotate(transformation_matrix3, glm::radians(theta + 240.0f), glm::normalize(glm::vec3(0.0f, 1.0f, 0.0f)));
+            glBindTexture(GL_TEXTURE_2D, texture);
 
-        unsigned int transformLoc3 = glGetUniformLocation(shaderProg, "transform");
-        glUniformMatrix4fv(transformLoc3, 1, GL_FALSE, glm::value_ptr(transformation_matrix3));
+            GLuint brightnessAddress = glGetUniformLocation(shaderProg, "brightness");
+            glUniform1f(brightnessAddress, 1.0f);
+            GLuint lightAddress = glGetUniformLocation(shaderProg, "lightPos");
+            glUniform3fv(lightAddress, 1, glm::value_ptr(lightPos));
+            GLuint lightColorAddress = glGetUniformLocation(shaderProg, "lightColor");
+            glUniform3fv(lightColorAddress, 1, glm::value_ptr(lightColor));
+            GLuint ambientStrAddress = glGetUniformLocation(shaderProg, "ambientStr");
+            glUniform1f(ambientStrAddress, ambientStr);
+            GLuint ambientColorAddress = glGetUniformLocation(shaderProg, "ambientColor");
+            glUniform3fv(ambientColorAddress, 1, glm::value_ptr(ambientColor));
+            GLuint cameraPosAddress = glGetUniformLocation(shaderProg, "cameraPos");
+            glUniform3fv(cameraPosAddress, 1, glm::value_ptr(cameraPos));
+            GLuint specStrAddress = glGetUniformLocation(shaderProg, "specStr");
+            glUniform1f(specStrAddress, specStr);
+            GLuint specPhongAddress = glGetUniformLocation(shaderProg, "specPhong");
+            glUniform1f(specPhongAddress, specPhong);
 
-        glBindVertexArray(VAO);
-        glDrawElements(GL_TRIANGLES, mesh_indices.size(), GL_UNSIGNED_INT, 0);
 
-        */
+            glUniform1i(tex0Address, 0);
+
+            glBindVertexArray(VAO);
+
+            glDrawArrays(GL_TRIANGLES, 0, fullVertexData.size() / 8);
+        }
+
+
+
+
 
         /* Swap front and back buffers */
         glfwSwapBuffers(window);
@@ -519,7 +677,7 @@ int main(void)
 
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VAO);
-    glDeleteBuffers(1, &EBO);
+    // glDeleteBuffers(1, &EBO);
 
     glfwTerminate();
     return 0;
